@@ -68,7 +68,7 @@ from mycobot_stack_env import (MycobotStackEnv, ARM_JOINTS, WRIST_ROLL_IDX,
                                GRIPPER_OPEN, GRIPPER_CLOSE,
                                CUBE_X_LO, CUBE_X_HI, CUBE_Y_LO, CUBE_Y_HI)
 from mycobot_stack_solver import (MycobotStackSolver, STACK_STANDOFF_HEIGHT,
-                                  STACK_RELEASE_GAP)
+                                  STACK_RELEASE_GAP, STANDOFF_HEIGHT)
 from train_bc_mycobot_stack import BCPolicySideChunk
 from collect_dataset_mycobot_stack import (DatasetLogger, _dr_setup, _dr_apply,
                                            fmt_hms, _close_mmap, _rm,
@@ -148,8 +148,23 @@ def _place_from_carry(env, solver, farther, nearer) -> None:
 
 
 def run_dagger_episode(env, solver, policy_bundle, logger, cfg, rng) -> dict:
-    """PHASE 0: policy drives k steps (recorded), then the solver completes
-    from the policy's own state (recorded).  Returns {"success": bool}."""
+    """PHASE 0 (unrecorded): the policy drives until a PHASE-CONSISTENT,
+    OBSERVABLE takeover trigger fires; then the solver completes from the
+    policy's own state (recorded).  Returns {"success": bool}.
+
+    Triggers (all functions of observable state, so the learned behaviour
+    switch is predictable from the observation):
+      * pinch within --trigger-radius of the target cube's STANDOFF point,
+        gripper not closed -> solver runs its FSM (its first stroke from here
+        is a small correction toward standoff, then descend->grasp — the SAME
+        phase the clean data teaches from these states; v2's from-anywhere
+        FSM restart instead injected rise-to-standoff labels onto low
+        near-cube states, measured on 58%% of suffixes, which contradicted the
+        clean descend/grasp labels and collapsed the aggregate's grasp rate);
+      * farther cube held (elevated + at pinch) -> place-half only;
+      * already stacked -> settle, keep.
+    No trigger within --max-policy-steps, or an unrecoverable state -> abort
+    (nothing recorded; successes-only drops it)."""
     model, mean, std, img_hw, chunk = policy_bundle
     decay = float(cfg["ensemble_decay"])
     arm_lo, arm_hi = env.arm_range[:, 0], env.arm_range[:, 1]
@@ -157,13 +172,12 @@ def run_dagger_episode(env, solver, policy_bundle, logger, cfg, rng) -> dict:
     renderer = logger.renderer
     qadr = logger.joint_qadr
     farther, nearer = env.pick_order()
-
-    k_handoff = int(rng.integers(cfg["min_policy_steps"],
-                                 cfg["max_policy_steps"] + 1))
+    trig_r = float(cfg["trigger_radius"])
 
     # ---- PHASE 0: the policy drives (exact eval-time inference) ---- #
     chunks_buf: deque[np.ndarray] = deque(maxlen=chunk)
-    for _ in range(k_handoff):
+    triggered = None
+    for _ in range(cfg["max_policy_steps"]):
         renderer.update_scene(env.data, camera="policy_cam")
         s_full = renderer.render().astype(np.float32) / 255.0
         s_t = torch.from_numpy(s_full).permute(2, 0, 1).contiguous().unsqueeze(0)
@@ -192,22 +206,33 @@ def run_dagger_episode(env, solver, policy_bundle, logger, cfg, rng) -> dict:
         if _abort_state(env, farther, nearer):
             return {"success": False}
 
-    # ---- HANDOFF: classify the policy's state ---- #
-    if env.is_stacked():
+        if env.is_stacked():
+            triggered = "stacked"
+            break
+        fp = env.cube_pos(farther)
+        elevated = fp[2] > env.table_top_z + env.cube_half + 0.012
+        if elevated and np.linalg.norm(fp - env.pinch_pos) < 0.035:
+            triggered = "carry"
+            break
+        if not elevated:
+            standoff = fp + np.array([0.0, 0.0, STANDOFF_HEIGHT])
+            near_standoff = np.linalg.norm(env.pinch_pos - standoff) < trig_r
+            grip_open = float(env.data.ctrl[env.grip_act]) > 0.006
+            if near_standoff and grip_open:
+                triggered = "approach"
+                break
+
+    # ---- TAKEOVER (recorded from here on) ---- #
+    if triggered is None:
+        return {"success": False}   # never reached a consistent takeover state
+    if triggered == "stacked":
         solver._hold(150, gripper=GRIPPER_OPEN)          # settle + confirm
         return {"success": bool(env.is_stacked())}
-
-    fp = env.cube_pos(farther)
-    elevated = fp[2] > env.table_top_z + env.cube_half + 0.012
-    in_hand = elevated and np.linalg.norm(fp - env.pinch_pos) < 0.035
-
-    if in_hand:
+    if triggered == "carry":
         _place_from_carry(env, solver, farther, nearer)
-    elif elevated:
-        return {"success": False}   # airborne/perched but not held: no branch
     else:
-        solver.run_episode()        # re-reads privileged positions; full re-pick
-
+        solver.run_episode()   # from near-standoff this continues the clean
+                               # FSM phase: small correction stroke -> descend
     return {"success": bool(env.is_stacked())}
 
 
@@ -295,7 +320,7 @@ def _run_signature(args):
                 successes_only=bool(args.successes_only),
                 policy=os.path.basename(args.policy),
                 ensemble_decay=args.ensemble_decay,
-                min_policy_steps=args.min_policy_steps,
+                trigger_radius=args.trigger_radius,
                 max_policy_steps=args.max_policy_steps,
                 out=os.path.basename(args.out),
                 # only in the signature when set, so old manifests still resume
@@ -325,12 +350,12 @@ def main():
                     help="seed BC policy that drives PHASE 0")
     ap.add_argument("--ensemble-decay", type=float, default=0.01,
                     help="ACT temporal-ensemble decay for the policy inference")
-    ap.add_argument("--min-policy-steps", type=int, default=0,
-                    help="lower bound of the per-episode random handoff step")
-    ap.add_argument("--max-policy-steps", type=int, default=120,
-                    help="upper bound of the per-episode random handoff step "
-                         "(capped low so kept episodes don't contain long "
-                         "failure-hover prefixes that BC would clone)")
+    ap.add_argument("--trigger-radius", type=float, default=0.05,
+                    help="takeover fires when the pinch is within this of the "
+                         "target cube's standoff point (jaws open)")
+    ap.add_argument("--max-policy-steps", type=int, default=200,
+                    help="abort the episode if no takeover trigger fires "
+                         "within this many policy control steps")
     ap.add_argument("--xml", default=None,
                     help="alternate scene MJCF (e.g. a higher-fidelity model); "
                          "must keep the naming contract in README.md")
@@ -346,8 +371,8 @@ def main():
         ap.error("--resolution must be in 1..720")
     if args.max_frames_per_episode <= 0 or args.checkpoint_every <= 0:
         ap.error("--max-frames-per-episode and --checkpoint-every must be positive")
-    if not (0 <= args.min_policy_steps <= args.max_policy_steps):
-        ap.error("need 0 <= --min-policy-steps <= --max-policy-steps")
+    if args.trigger_radius <= 0 or args.max_policy_steps <= 0:
+        ap.error("--trigger-radius and --max-policy-steps must be positive")
     if not os.path.exists(args.policy):
         ap.error(f"--policy {args.policy} not found")
 
@@ -372,7 +397,7 @@ def main():
         policy_path=os.path.abspath(args.policy),
         xml=(os.path.abspath(args.xml) if args.xml else None),
         ensemble_decay=args.ensemble_decay,
-        min_policy_steps=args.min_policy_steps,
+        trigger_radius=args.trigger_radius,
         max_policy_steps=args.max_policy_steps,
         side_img_tmpl=os.path.join(tmpdir, base + ".w{w}.images_side.npy"),
         jnt_tmpl=os.path.join(tmpdir, base + ".w{w}.joints.npy"),
@@ -410,7 +435,7 @@ def main():
           f"across {W} workers @ {res}x{res} px, every {args.rate} substeps "
           f"(~{500.0 / args.rate:.0f} Hz).  "
           f"policy={os.path.basename(args.policy)} decay={args.ensemble_decay} "
-          f"handoff k~U[{args.min_policy_steps},{args.max_policy_steps}]"
+          f"trigger r={args.trigger_radius} cap={args.max_policy_steps}"
           f"{'  [successful only]' if args.successes_only else ''}", flush=True)
     print(f"Per-worker episodes: {[c for _, _, c in chunks]}; checkpoint every "
           f"{args.checkpoint_every}; temps in {tmpdir} (~{per_worker_gb:.1f} GB/worker).",

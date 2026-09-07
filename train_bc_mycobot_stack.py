@@ -179,6 +179,13 @@ def run_epoch(model, loader, loss_fn, device, optimizer=None, scaler=None, augme
 def main():
     ap = argparse.ArgumentParser(description="Action-chunked single-cam BC training.")
     ap.add_argument("--data", default="dataset_mycobot_stack.npz")
+    ap.add_argument("--extra-data", action="append", default=[],
+                    help="additional npz(s) aggregated with --data (classic "
+                         "DAgger: clean demos + correction sets)")
+    ap.add_argument("--eval-every", type=int, default=5,
+                    help="snapshot + in-flight closed-loop eval cadence "
+                         "(epochs); the task peak can sit between the default "
+                         "5-epoch marks")
     ap.add_argument("--out", default="bc_mycobot_stack.pt")
     ap.add_argument("--epochs", type=int, default=25)
     ap.add_argument("--batch", type=int, default=256)
@@ -211,34 +218,66 @@ def main():
     print(f"side images: {side_mm.shape} {side_mm.dtype} ({side_mm.nbytes/1e9:.1f} GB)",
           flush=True)
 
+    extras = []
+    extra_gb = 0.0
+    for p in args.extra_data:
+        em = np.load(p)
+        emm = npz_member_memmap(p, "images_side.npy")
+        if emm.shape[1:] != side_mm.shape[1:]:
+            raise SystemExit(f"{p}: image shape {emm.shape[1:]} != {side_mm.shape[1:]}")
+        extras.append((p, em, emm))
+        extra_gb += emm.nbytes / 1e9
+        print(f"extra data {p}: {emm.shape} (+{emm.nbytes/1e9:.1f} GB)", flush=True)
+
     import psutil
     avail_gb = psutil.virtual_memory().available / 1e9
     bps_side = int(np.prod(side_mm.shape[1:]))
     total_gb = side_mm.nbytes / 1e9
     headroom_gb = 12.0
 
-    if total_gb + headroom_gb < avail_gb:
+    # Extras (DAgger correction sets) always load fully; only the (redundant)
+    # main set auto-subsamples when the combination does not fit.
+    if total_gb + extra_gb + headroom_gb < avail_gb:
         load_frames = int(side_mm.shape[0])
         why = "full dataset fits in RAM"
     else:
-        budget = (avail_gb - headroom_gb) * 1e9
+        budget = (avail_gb - headroom_gb - extra_gb) * 1e9
         fit_frames = int(budget / bps_side)
         cum = np.cumsum(lengths)
         E_fit = int(np.searchsorted(cum, fit_frames, side="right"))
         load_frames = int(cum[E_fit - 1]) if E_fit > 0 else 0
-        why = (f"auto-subsample: total {total_gb:.1f} GB > avail {avail_gb:.1f} GB; "
-               f"loading {E_fit}/{len(lengths)} eps ({load_frames} frames)")
+        why = (f"auto-subsample: main {total_gb:.1f} GB + extra {extra_gb:.1f} GB "
+               f"> avail {avail_gb:.1f} GB; loading {E_fit}/{len(lengths)} main "
+               f"eps ({load_frames} frames) + all extra")
     print(f"RAM plan: {why}", flush=True)
-    t_load = time.perf_counter()
-    side = np.array(side_mm[:load_frames], copy=True)
-    del side_mm
-    print(f"loaded side {side.shape} in {time.perf_counter()-t_load:.1f}s", flush=True)
 
     cum = np.cumsum(lengths)
     n_eps_loaded = int(np.searchsorted(cum, load_frames, side="right"))
-    starts = starts[:n_eps_loaded]
-    lengths = lengths[:n_eps_loaded]
-    print(f"episodes loaded: {n_eps_loaded}  frames loaded: {load_frames}", flush=True)
+    starts = starts[:n_eps_loaded].astype(np.int64)
+    lengths = lengths[:n_eps_loaded].astype(np.int64)
+    joint_angles = joint_angles[:load_frames]
+
+    extra_frames = sum(int(e[2].shape[0]) for e in extras)
+    t_load = time.perf_counter()
+    side = np.empty((load_frames + extra_frames,) + side_mm.shape[1:],
+                    dtype=np.uint8)
+    side[:load_frames] = side_mm[:load_frames]
+    del side_mm
+    off = load_frames
+    for p, em, emm in extras:
+        n = int(emm.shape[0])
+        side[off:off + n] = emm[:]
+        del emm
+        joint_angles = np.concatenate(
+            [joint_angles, em["joint_angles"].astype(np.float32)], axis=0)
+        starts = np.concatenate(
+            [starts, em["episode_starts"].astype(np.int64) + off])
+        lengths = np.concatenate(
+            [lengths, em["episode_lengths"].astype(np.int64)])
+        off += n
+    load_frames = off
+    print(f"loaded side {side.shape} in {time.perf_counter()-t_load:.1f}s", flush=True)
+    print(f"episodes loaded: {len(lengths)}  frames loaded: {load_frames}", flush=True)
 
     train_idx, val_idx = build_indices(starts, lengths, args.val_frac, rng,
                                        args.chunk, args.limit_episodes)
@@ -330,7 +369,7 @@ def main():
               f"val {val_loss:.5f}  lr {lr_now:.2e}  {dt:5.1f}s"
               f"{'  <- best, saved' if improved else ''}", flush=True)
 
-        if epoch % 5 == 0 or epoch == args.epochs:
+        if epoch % args.eval_every == 0 or epoch == args.epochs:
             snap = args.out.replace(".pt", f"_epoch{epoch}.pt")
             _save(snap, epoch, train_loss, val_loss)
             json_p = args.out.replace(".pt", f"_eval100_epoch{epoch}.json")
