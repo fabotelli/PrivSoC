@@ -1,0 +1,205 @@
+<!-- ===================================================================== -->
+<!--  Two-cube STACKING scene for the myCobot 280 (MuJoCo 3.x / MJCF)      -->
+<!-- ===================================================================== -->
+<!--                                                                       -->
+<!--  Port of learm_scene_cube_stack.xml to the Elephant Robotics          -->
+<!--  myCobot 280 (JN variant kinematics; identical across 280 variants).  -->
+<!--    * Arm chain + joint names verbatim from the official               -->
+<!--      mycobot_280jn_mujoco.xml (joint2_to_joint1 ... joint7_to_joint6  -->
+<!--      = J1..J6, 1:1 with pymycobot indices).  Meshes kept visual-only  -->
+<!--      (contype 0) exactly like the LeArm scene's arm class.            -->
+<!--    * Parallel gripper (~40 mm max opening, ~19 mm jaw depth) modelled -->
+<!--      as two box fingers on joint6_flange; one actuated slide joint    -->
+<!--      grip_left, right jaw coupled -1 via <equality>.                  -->
+<!--    * Base plate flush with the table top (z = 0.15): desktop-arm      -->
+<!--      deployment, cubes on the same surface the arm stands on.         -->
+<!--    * Everything else (table, cubes, lights, cameras, collision        -->
+<!--      filtering, option line, DR-facing materials) copied from the     -->
+<!--      LeArm scene, re-centred for the 280's reach.                     -->
+<!-- ===================================================================== -->
+<mujoco model="mycobot_cube_stack">
+
+  <compiler angle="radian" meshdir="meshes_mycobot" autolimits="true"/>
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="implicit"
+          iterations="200" noslip_iterations="10"/>
+
+  <visual>
+    <global offwidth="1280" offheight="720"/>
+    <quality shadowsize="2048"/>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.4 0.4 0.4"/>
+  </visual>
+
+  <default>
+    <default class="arm">
+      <joint type="hinge" damping="0.6" armature="0.01"/>
+      <geom  type="mesh" rgba="0.88 0.89 0.92 1" contype="0" conaffinity="0"/>
+    </default>
+
+    <default class="finger">
+      <joint type="slide" damping="2.0" armature="0.01"/>
+      <geom  type="box" rgba="0.15 0.15 0.18 1" contype="0" conaffinity="0"/>
+    </default>
+
+    <default class="pad">
+      <geom type="box" rgba="0.1 0.5 0.12 1" friction="3.0 0.1 0.002"
+            condim="4" solimp="0.999 0.9999 0.0001 0.5 2"
+            contype="4" conaffinity="1"/>
+    </default>
+
+    <default class="env">
+      <geom contype="2" conaffinity="1"/>
+    </default>
+  </default>
+
+  <asset>
+    <texture name="grid" type="2d" builtin="checker"
+             rgb1="0.20 0.28 0.36" rgb2="0.10 0.14 0.18" width="300" height="300"/>
+    <material name="grid"  texture="grid" texrepeat="8 8" reflectance="0.1"/>
+    <material name="table" rgba="0.75 0.60 0.45 1"/>
+
+    <!-- BOTH cubes share the same saturated-red material: identical appearance
+         is the whole point - the policy must localise both and infer which is
+         farther / nearer from geometry alone, not colour. -->
+    <material name="cube_red" rgba="0.90 0.10 0.10 1"/>
+
+    <mesh name="joint1_jet" file="joint1_jet.stl"/>
+    <mesh name="joint2" file="joint2.stl"/>
+    <mesh name="joint3" file="joint3.stl"/>
+    <mesh name="joint4" file="joint4.stl"/>
+    <mesh name="joint5" file="joint5.stl"/>
+    <mesh name="joint6" file="joint6.stl"/>
+    <mesh name="joint7" file="joint7.stl"/>
+  </asset>
+
+  <worldbody>
+    <!-- Two key lights so a single light's random dim doesn't put the back of
+         the scene into deep shadow. -->
+    <light pos="0.20 0.0 1.2" dir="0 0 -1" diffuse="0.7 0.7 0.7"/>
+    <light pos="0.20 -0.4 0.8" dir="0 0.4 -1" diffuse="0.4 0.4 0.4"/>
+    <geom name="floor" class="env" type="plane" size="2 2 0.1" material="grid"/>
+
+    <!-- Cameras: same viewing geometry as the LeArm scene (orientations
+         verbatim), positions shifted so they look at the re-centred cube
+         zone (centre ~(0.1725, 0.0, 0.16)). -->
+    <camera name="policy_cam" pos="0.357 -0.242 0.353" xyaxes="0.79616 0.60508 -0.00000 -0.32506 0.42771 0.84345"/>
+    <camera name="demo_cam"   pos="0.373 -0.550 0.600" xyaxes="0.93979 0.34174 -0.00000 -0.20831 0.57286 0.79274"/>
+
+    <!-- Work table: top at z = 0.15 m, spans x in [0.02, 0.30], y in [-0.16, 0.16]. -->
+    <body name="table" pos="0.16 0 0.075">
+      <geom name="table_top" class="env" type="box" size="0.14 0.16 0.075" material="table"/>
+    </body>
+
+    <!-- Pedestal raises the myCobot base plate flush with the table top:
+         the arm effectively stands on the same surface the cubes lie on
+         (desktop deployment of the real 280). -->
+    <geom name="pedestal" type="cylinder" size="0.05 0.075" pos="0 0 0.075"
+          rgba="0.25 0.25 0.28 1" contype="0" conaffinity="0"/>
+
+    <!-- ================================================================= -->
+    <!--  THE myCobot 280 (chain verbatim from mycobot_280jn_mujoco.xml;   -->
+    <!--  collision copies dropped - arm is visual-only like the LeArm).   -->
+    <!-- ================================================================= -->
+    <body name="base_link" pos="0 0 0.15" gravcomp="1">
+      <geom quat="0.000796327 0 0 1" class="arm" mesh="joint1_jet"/>
+
+      <body name="joint2" pos="0 0 0.15756" gravcomp="1">
+        <inertial pos="-4.46252e-07 -0.0048982 -0.0203936" quat="0.988685 0.150004 1.75753e-05 -6.19332e-05" mass="0.153266" diaginertia="0.00010997 0.000104609 4.89092e-05"/>
+        <joint name="joint2_to_joint1" class="arm" axis="0 0 1" range="-2.9321 2.9321"/>
+        <geom pos="0 0 -0.06096" quat="0.707105 0 0 -0.707108" class="arm" mesh="joint2"/>
+
+        <body name="joint3" pos="0 0 -0.001" quat="0.499998 0.500002 0.5 -0.5" gravcomp="1">
+          <inertial pos="-0.0548658 -3.79418e-06 0.0581352" quat="0.50338 0.49662 0.497294 0.502669" mass="0.4" diaginertia="0.000569683 0.000554829 8.82752e-05"/>
+          <joint name="joint3_to_joint2" class="arm" axis="0 0 1" range="-2.0943 2.0943"/>
+          <geom pos="0 0 0.03256" quat="0.707105 0 -0.707108 0" class="arm" mesh="joint3"/>
+
+          <body name="joint4" pos="-0.1104 0 0" gravcomp="1">
+            <inertial pos="-0.0454441 4.51021e-07 0.00478273" quat="0.508392 0.491471 0.491339 0.508508" mass="0.219069" diaginertia="0.000359328 0.000340078 6.35956e-05"/>
+            <joint name="joint4_to_joint3" class="arm" axis="0 0 1" range="-2.6179 2.6179"/>
+            <geom pos="0 0 0.03056" quat="0.707105 0 -0.707108 0" class="arm" mesh="joint4"/>
+
+            <body name="joint5" pos="-0.096 0 0.06462" quat="0.707105 0 0 -0.707108" gravcomp="1">
+              <inertial pos="1.49997e-05 -0.00761485 -0.00688111" quat="0.903244 0.429125 -0.00118023 0.00112811" mass="0.0576212" diaginertia="1.88765e-05 1.81573e-05 1.0565e-05"/>
+              <joint name="joint5_to_joint4" class="arm" axis="0 0 1" range="-2.5307 2.5307"/>
+              <geom pos="0 0 -0.03356" quat="0.707105 -0.707108 0 0" class="arm" mesh="joint5"/>
+
+              <body name="joint6" pos="0 -0.07318 0" quat="0.499998 0.5 -0.5 0.500002" gravcomp="1">
+                <inertial pos="-3.34552e-08 0.00487808 -0.00751659" quat="0.395895 0.918296 6.92557e-06 2.44425e-06" mass="0.0904837" diaginertia="4.06947e-05 3.23387e-05 2.57661e-05"/>
+                <joint name="joint6_to_joint5" class="arm" axis="0 0 1" range="-2.8797 2.8797"/>
+                <geom pos="0 0 -0.038" class="arm" mesh="joint6"/>
+
+                <body name="joint6_flange" pos="0 0.0456 0" quat="0.707105 -0.707108 0 0" gravcomp="1">
+                  <inertial pos="-6.68861e-07 -1.54403e-07 -0.00514555" quat="0.276336 0.650875 -0.27633 0.650877" mass="0.0121397" diaginertia="1.94827e-06 1.13494e-06 1.13491e-06"/>
+                  <joint name="joint7_to_joint6" class="arm" axis="0 0 1" range="-3.14 3.14159"/>
+                  <geom pos="0 0 -0.012" class="arm" mesh="joint7"/>
+
+                  <!-- Wrist camera on the flange (NOT recorded - single-cam
+                       recipe; kept for the next phase only). -->
+                  <camera name="wrist_cam" pos="0 0 0.02" xyaxes="1 0 0 0 -1 0"/>
+
+                  <!-- Pinch site at the fingertip midpoint; z-axis = flange z
+                       = approach direction (down at grasp). -->
+                  <site name="pinch" pos="0 0 0.058" size="0.005" rgba="1 1 0 0" group="3"/>
+
+                  <!-- ======================================================= -->
+                  <!--  Parallel gripper: palm + two box fingers on slides.    -->
+                  <!--  Max opening 40 mm (inner faces +-0.020 at s=0.0185),   -->
+                  <!--  jaw (pad) depth ~19 mm.  Only THIS block changes if    -->
+                  <!--  the real gripper differs (see HANDOVER).               -->
+                  <!-- ======================================================= -->
+                  <geom name="palm" type="box" size="0.015 0.032 0.010" pos="0 0 0.012"
+                        rgba="0.15 0.15 0.18 1" contype="0" conaffinity="0"/>
+
+                  <body name="grip_left_link" pos="0 0.005 0.024" gravcomp="1">
+                    <joint name="grip_left" class="finger" axis="0 1 0" range="-0.001 0.0185"/>
+                    <geom name="finger_l" class="finger" size="0.006 0.0035 0.018" pos="0 0 0.018"/>
+                    <geom name="pad_l" class="pad" size="0.005 0.0015 0.0095" pos="0 -0.005 0.026"/>
+                  </body>
+
+                  <body name="grip_right_link" pos="0 -0.005 0.024" gravcomp="1">
+                    <joint name="grip_right" class="finger" axis="0 1 0" range="-0.0185 0.001"/>
+                    <geom name="finger_r" class="finger" size="0.006 0.0035 0.018" pos="0 0 0.018"/>
+                    <geom name="pad_r" class="pad" size="0.005 0.0015 0.0095" pos="0 0.005 0.026"/>
+                  </body>
+
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- ----------------------------------------------------------------- -->
+    <!--  Two identical red cubes (1.9 cm side), free joints.               -->
+    <!-- ----------------------------------------------------------------- -->
+    <body name="cube_a" pos="0.165 -0.040 0.163">
+      <freejoint name="cube_a_free"/>
+      <geom name="cube_a_geom" type="box" size="0.0095 0.0095 0.0095" material="cube_red"
+            friction="3.0 0.1 0.002" condim="4" density="1312"
+            solimp="0.999 0.9999 0.0001 0.5 2" contype="1" conaffinity="3"/>
+    </body>
+
+    <body name="cube_b" pos="0.165 0.020 0.163">
+      <freejoint name="cube_b_free"/>
+      <geom name="cube_b_geom" type="box" size="0.0095 0.0095 0.0095" material="cube_red"
+            friction="3.0 0.1 0.002" condim="4" density="1312"
+            solimp="0.999 0.9999 0.0001 0.5 2" contype="1" conaffinity="3"/>
+    </body>
+
+  </worldbody>
+
+  <equality>
+    <joint joint1="grip_right" joint2="grip_left" polycoef="0 -1 0 0 0"/>
+  </equality>
+
+  <actuator>
+    <position name="a_j1" joint="joint2_to_joint1" kp="20" kv="2" forcerange="-20 20" ctrlrange="-2.9321 2.9321"/>
+    <position name="a_j2" joint="joint3_to_joint2" kp="20" kv="2" forcerange="-20 20" ctrlrange="-2.0943 2.0943"/>
+    <position name="a_j3" joint="joint4_to_joint3" kp="20" kv="2" forcerange="-20 20" ctrlrange="-2.6179 2.6179"/>
+    <position name="a_j4" joint="joint5_to_joint4" kp="20" kv="2" forcerange="-20 20" ctrlrange="-2.5307 2.5307"/>
+    <position name="a_j5" joint="joint6_to_joint5" kp="20" kv="2" forcerange="-20 20" ctrlrange="-2.8797 2.8797"/>
+    <position name="a_j6" joint="joint7_to_joint6" kp="20" kv="2" forcerange="-20 20" ctrlrange="-3.14 3.14159"/>
+    <position name="a_grip" joint="grip_left" kp="300" kv="5" forcerange="-15 15" ctrlrange="-0.001 0.0185"/>
+  </actuator>
+
+</mujoco>
