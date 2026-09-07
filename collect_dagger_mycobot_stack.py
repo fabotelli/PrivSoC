@@ -16,9 +16,13 @@ here is the FIRST one, so the handoff point is randomised):
 
   PHASE 0 -- the trained POLICY drives for k control steps, k ~ U[min,max]
              per episode (exact replica of eval_bc_mycobot_stack's
-             temporal-ensemble inference), recorded at the solver's capture
-             cadence.  Detectably-unrecoverable states (cube off the table /
-             out of the IK-feasible patch / wrong cube lifted) abort early.
+             temporal-ensemble inference), UNRECORDED: it only generates a
+             realistic policy-visited state.  (Recording it is poison: the
+             handoff time is an RNG draw the observation cannot see, so
+             prefix frames get bimodal chunk labels — measured val 0.10 vs
+             0.008 clean, 0/100 closed loop.  See trim_dagger_prefix.py.)
+             Detectably-unrecoverable states (cube off the table / out of
+             the IK-feasible patch / wrong cube lifted) abort early.
   HANDOFF -- classify the policy's state:
                * already stacked        -> settle, done (rare, kept);
                * farther cube IN HAND   -> solver runs its place-half
@@ -178,9 +182,12 @@ def run_dagger_episode(env, solver, policy_bundle, logger, cfg, rng) -> dict:
 
         env.set_arm_target(np.clip(action[:6], arm_lo, arm_hi))
         env.set_gripper(float(np.clip(action[6], grip_lo, grip_hi)))
-        for _ in range(cfg["rate"]):
-            env.step()
-            logger.capture(env.data)
+        # NOT recorded: the prefix only generates a realistic policy-visited
+        # state.  Recording it poisons training — when the solver takes over
+        # is an RNG draw the observation cannot see, so prefix frames get
+        # chunk labels that switch policy->solver unpredictably (bimodal
+        # targets; measured val 0.10 vs 0.008 clean, 0/100 closed loop).
+        env.step(cfg["rate"])
 
         if _abort_state(env, farther, nearer):
             return {"success": False}
