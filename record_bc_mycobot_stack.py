@@ -111,13 +111,16 @@ def main():
     ap.add_argument("--ensemble-decay", type=float, default=0.01)
     ap.add_argument("--vid-res", type=int, default=512)
     ap.add_argument("--fps", type=int, default=30)
+    ap.add_argument("--xml", default=None,
+                    help="alternate scene MJCF (e.g. a higher-fidelity model); "
+                         "must keep the naming contract in README.md")
     args = ap.parse_args()
 
     device = torch.device("cpu")
     model, mean, std, img_hw, k = _load_policy(args.policy, device)
     want = not args.failure
 
-    env = MycobotStackEnv()
+    env = MycobotStackEnv(xml_path=args.xml)
     env.model.vis.global_.offwidth = args.vid_res
     env.model.vis.global_.offheight = args.vid_res
     vid_renderer = mujoco.Renderer(env.model, height=args.vid_res, width=args.vid_res)

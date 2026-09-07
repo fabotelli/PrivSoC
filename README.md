@@ -18,6 +18,60 @@ pixels alone.
 | **Policy** | `bc_mycobot_stack.pt` — the deliverable weights (always the current best-task champion) |
 | **ReadMe** | `README.md` — this file |
 
+## Quickstart — run the policy in sim yourself
+
+```bash
+git clone https://github.com/fabotelli/PrivSoC.git && cd PrivSoC
+pip install mujoco torch numpy imageio imageio-ffmpeg
+# headless machine (no display)? add:  export MUJOCO_GL=osmesa   (or egl on a GPU)
+
+# 1. watch the shipped champion do one episode (writes demo.mp4)
+python3 record_bc_mycobot_stack.py --policy bc_mycobot_stack.pt --out demo.mp4
+
+# 2. full diagnostic eval + solver baseline (200 eps; ~13 min on 24 cores,
+#    scales linearly — set --workers to your core count minus a few)
+python3 eval_bc_mycobot_stack.py --policy bc_mycobot_stack.pt \
+    --episodes 200 --workers 8 --save-json my_eval.json
+```
+
+Expected on the shipped scene: **solver 100%, policy ~48.5% overall / ~65%
+grasp** (seeds 20000+). If you reproduce those numbers, your setup is good.
+Everything runs on CPU; no GPU needed for inference or eval.
+
+### Running it on your own scene MJCF (`--xml`)
+
+`eval_bc_mycobot_stack.py`, `record_bc_mycobot_stack.py` and
+`collect_dagger_mycobot_stack.py` all accept `--xml your_model.xml` to swap
+the world model (e.g. a higher-fidelity 280 model) while keeping the policy
+and harness unchanged. Your MJCF must keep the **naming contract** — the env
+resolves everything by name:
+
+| What | Required names |
+|---|---|
+| arm joints | `joint2_to_joint1` … `joint7_to_joint6` (J1..J6) |
+| gripper | slide joint `grip_left`, actuator `a_grip` |
+| arm actuators | `a_j1` … `a_j6` (position) |
+| cubes | bodies `cube_a`/`cube_b`, free joints `cube_a_free`/`cube_b_free`, geom `cube_a_geom` |
+| end-effector | site `pinch` (between the fingertips) |
+| camera | fixed camera `policy_cam` (the policy's single view) |
+| DR hooks | material `table` (+ scene lights) |
+
+Suggested order for estimating the sim-to-real delta with a hi-fi model:
+
+1. **Gate the teacher**: `eval ... --xml hifi.xml` *without* `--skip-solver`.
+   The solver baseline tells you whether the *task* survived your physics
+   (expect ~100%). If it drops, re-sweep the two contact constants
+   (`sweep_solver_geometry.py`: `GRASP_DROP`, `STACK_RELEASE_GAP`) first —
+   otherwise you'll misread teacher breakage as transfer gap.
+2. **Measure the delta**: same eval with the shipped policy, same seeds as
+   the baseline table above. The drop vs 48.5% is your s2r-delta estimate,
+   and the diagnostic breakdown localizes it (selection = visual gap,
+   grasp = contact/servo gap).
+3. **Close it**: `collect_dagger_mycobot_stack.py --xml hifi.xml --policy
+   bc_mycobot_stack.pt ...` then retrain (`run_dagger_pipeline.sh` shows the
+   exact train/eval calls) — the solver corrects the policy exactly where
+   your physics makes it misbehave.
+
 ## Pipeline
 
 ```
@@ -98,7 +152,8 @@ pipeline:
 
 1. **Port the scene, keep the contract.** Same obs/action interface: one
    256x256 side cam at the calibrated pose, 7-dim joint state, 10 Hz joint
-   targets. Only the world model changes.
+   targets. Only the world model changes — if it is another MJCF, that is
+   just `--xml` (see Quickstart above).
 2. **Zero-shot eval the frozen policy** there with the same diagnostic
    harness. The breakdown localizes the gap: grasp collapse with intact
    selection = dynamics/contact gap; selection collapse = visual gap.

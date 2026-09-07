@@ -129,7 +129,7 @@ def eval_chunk(task):
     torch.set_num_threads(1)
     device = torch.device("cpu")
     model, mean, std, img_hw, k = _load_policy(cfg["policy_path"], device)
-    env = MycobotStackEnv()
+    env = MycobotStackEnv(xml_path=cfg.get("xml"))
     with gl_lock:
         renderer = _make_renderer(env, img_hw[0])
     qadr = _joint_qadr(env)
@@ -176,7 +176,7 @@ def eval_chunk(task):
 
 def solver_chunk(task):
     wid, seeds, cfg, gl_lock = task
-    env = MycobotStackEnv()
+    env = MycobotStackEnv(xml_path=cfg.get("xml"))
     solver = MycobotStackSolver(env)
     results = []
     for seed in seeds:
@@ -230,10 +230,14 @@ def main():
     ap.add_argument("--ensemble-decay", type=float, default=0.01)
     ap.add_argument("--save-json", default=None)
     ap.add_argument("--skip-solver", action="store_true")
+    ap.add_argument("--xml", default=None,
+                    help="alternate scene MJCF (e.g. a higher-fidelity model); "
+                         "must keep the naming contract in README.md")
     args = ap.parse_args()
 
     cfg = dict(rate=args.rate, eval_max_steps=args.max_steps,
-               policy_path=args.policy, ensemble_decay=args.ensemble_decay)
+               policy_path=args.policy, ensemble_decay=args.ensemble_decay,
+               xml=args.xml)
     seeds = [args.start_seed + i for i in range(args.episodes)]
 
     t0 = time.perf_counter()

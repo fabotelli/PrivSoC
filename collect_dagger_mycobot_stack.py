@@ -231,7 +231,7 @@ def collect_chunk(task):
             farther, nearer = [], []
             resume = False
 
-    env = MycobotStackEnv()
+    env = MycobotStackEnv(xml_path=cfg.get("xml"))
     with gl_lock:
         logger = DatasetLogger(
             env, capacity=ep_count * cfg["max_frames"], rate=cfg["rate"],
@@ -290,7 +290,9 @@ def _run_signature(args):
                 ensemble_decay=args.ensemble_decay,
                 min_policy_steps=args.min_policy_steps,
                 max_policy_steps=args.max_policy_steps,
-                out=os.path.basename(args.out))
+                out=os.path.basename(args.out),
+                # only in the signature when set, so old manifests still resume
+                **({"xml": os.path.basename(args.xml)} if args.xml else {}))
 
 
 def main():
@@ -322,6 +324,9 @@ def main():
                     help="upper bound of the per-episode random handoff step "
                          "(capped low so kept episodes don't contain long "
                          "failure-hover prefixes that BC would clone)")
+    ap.add_argument("--xml", default=None,
+                    help="alternate scene MJCF (e.g. a higher-fidelity model); "
+                         "must keep the naming contract in README.md")
     args = ap.parse_args()
 
     if args.episodes <= 0:
@@ -358,6 +363,7 @@ def main():
         rate=args.rate, res=res, max_frames=args.max_frames_per_episode,
         successes_only=args.successes_only, checkpoint_every=args.checkpoint_every,
         policy_path=os.path.abspath(args.policy),
+        xml=(os.path.abspath(args.xml) if args.xml else None),
         ensemble_decay=args.ensemble_decay,
         min_policy_steps=args.min_policy_steps,
         max_policy_steps=args.max_policy_steps,
@@ -389,7 +395,7 @@ def main():
             json.dump(sig, f, indent=2)
     cfg["resume"] = resuming
 
-    timestep = float(MycobotStackEnv().model.opt.timestep)
+    timestep = float(MycobotStackEnv(xml_path=cfg["xml"]).model.opt.timestep)
 
     per_worker_gb = (max(c for _, _, c in chunks) * args.max_frames_per_episode
                      * res * res * 3 / 1e9)
