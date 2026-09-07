@@ -40,7 +40,9 @@ stack it on top of the NEARER cube**.
   palm box + fingers extending along flange +z (the tool axis, pointing down
   at grasp). One actuated slide joint `grip_left` (axis +y, range
   [-0.001, 0.0185] m), right jaw mirrored via
-  `<equality><joint polycoef="0 -1 0 0 0">`. Max opening 40 mm, pad (jaw)
+  `<equality><joint polycoef="0 -1 0 0 0">` stiffened to a near-rigid
+  rack-coupling (solref 0.002; MuJoCo's default softness let the jaws drift
+  ~5 mm asymmetric under grip load — see DECISIONS.md #19). Max opening 40 mm, pad (jaw)
   depth 19 mm, friction 3.0 pads. `pinch` site at the fingertip midpoint,
   z-axis along the approach. `GRIPPER_OPEN=0.016` (33 mm opening),
   `GRIPPER_CLOSE=-0.001` (~12 mm over-travel past cube contact → ≈3.6 N
@@ -78,6 +80,10 @@ approach(standoff over farther cube) → descend → close-grip → lift
   (6-DoF, 3D position + approach-axis alignment to vertical, pos_tol 8e-4,
   damping 0.05, joint limits clamped per iteration), then tracked by a
   joint-space slew limiter (**0.005 rad/substep**) until within settle_tol.
+  Vertical strokes (descend/lift/lower/retreat) track IK via-points every
+  ~12 mm along the straight line: plain joint-space interpolation bows the
+  pinch up to 26 mm sideways on this arm — more than the jaw clearance —
+  and shoves the cube (DECISIONS.md #19).
   The wrist roll (J6) is a free DoF about the approach axis; it is pinned
   after IK so the jaws align with the cube's yaw (mod 90°, verified to
   0.10° worst-case on rendered seeds).
@@ -94,11 +100,14 @@ approach(standoff over farther cube) → descend → close-grip → lift
   |---|---|---|
   | STANDOFF_HEIGHT | 0.05 | kept from LeArm (gripper not taller) |
   | STACK_STANDOFF_HEIGHT | 0.085 | kept from LeArm |
-  | GRASP_DROP | **0.009** | 0.004→75%, 0.006→53%, 0.0075→79%, 0.008→92%, 0.009→**100%**, 0.012→100% (shallow drops fail as missed-grasp: pads bite too high). Smallest 100% value; fingertip clips the table plane by 1.5 mm nominal → 2–3 mm mat on the real desk |
-  | STACK_RELEASE_GAP | **0.006** | at drop 0.009: 0.006/0.010/0.014/0.020 all 100/100 → smallest no-loss gap (fingertip stays ~4.5 mm above base-cube top at release) |
+  | GRASP_DROP | **0.0075** | under fixed physics all of {0.006, 0.0075, 0.009, 0.012} are 100/100; 0.0075 centres the pad on the cube with the fingertip exactly at the table plane (zero clip). An earlier sweep favouring 0.009 was confounded by the descend-shove defect |
+  | STACK_RELEASE_GAP | **0.006** | 0.006/0.010/0.014/0.020 all 100/100 → smallest no-loss gap (fingertip stays clear of the base-cube top at release) |
 
-- **Teacher self-test (GATE A): 100/100 stacked** (seeds 0-99, no DR).
-  Episode length 52–58 policy frames (52.7–53.4 mean across sweeps).
+- **Teacher self-test (GATE A): 100/100 stacked** (seeds 0-99, no DR;
+  re-verified after the physics fixes). Episode length ~84 policy frames
+  mean, 89 max (the straight-stroke via-points settle in stages); eval
+  step budget 280 keeps cube_stack's ~3.3x margin (170 for its ~51-frame
+  teacher).
 
 ## 4. Data
 
@@ -155,9 +164,9 @@ GATE D verdict: TBD-VERDICT
 1. **Base height**: scene assumes the base plate exactly at table-top level.
    Measure the real offset and set `BASE_HEIGHT_OFFSET` in
    `mycobot_stack_env.py` (added to base z at load).
-2. **Work surface**: place a **2–3 mm compliant mat** (cork/EVA) under the
-   cube zone — the swept grasp depth (GRASP_DROP 0.009) nominally brings the
-   fingertip 1.5 mm below the table plane at the deepest grip.
+2. **Work surface**: flat and hard. At the deepest grip (GRASP_DROP
+   0.0075) the fingertip touches the table plane exactly — no mat needed;
+   avoid raised lips or soft mats >1 mm in the cube zone.
 3. **Gripper geometry**: the sim gripper is a 40 mm-opening, 19 mm-jaw-depth
    parallel model on `joint6_flange`; ONLY the gripper block of
    `mycobot_scene_cube_stack.xml` (palm/fingers/pads + `a_grip` actuator +

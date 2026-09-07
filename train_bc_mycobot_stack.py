@@ -192,7 +192,7 @@ def main():
     ap.add_argument("--augment", action="store_true")
     ap.add_argument("--bottleneck", type=int, default=256)
     ap.add_argument("--ensemble-decay", type=float, default=0.01)
-    ap.add_argument("--eval-max-steps", type=int, default=170)
+    ap.add_argument("--eval-max-steps", type=int, default=280)
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)

@@ -1,0 +1,12 @@
+=== GRASP_DROP re-sweep under fixed physics (gap 0.006, 100 eps) ===
+  drop=0.0060: 100/100
+  drop=0.0075: 100/100
+  drop=0.0090: 100/100
+  drop=0.0120: 100/100
+best (smallest at max) = 0.006
+=== STACK_RELEASE_GAP re-sweep at best drop (100 eps) ===
+  gap=0.006: 100/100
+  gap=0.010: 100/100
+  gap=0.014: 100/100
+  gap=0.020: 100/100
+smallest no-loss gap = 0.006 (100/100)

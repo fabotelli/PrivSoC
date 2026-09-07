@@ -44,19 +44,22 @@ from mycobot_stack_env import (MycobotStackEnv, APPROACH_DOWN,
 
 # Waypoint offsets.
 STANDOFF_HEIGHT = 0.05    # standoff above cube pre-/post-grasp (kept from LeArm)
-GRASP_DROP = 0.009        # grasp this far below cube centre.  Swept 0.004-0.012:
-                          # <=0.0075 fails 21-47% as missed_grasp (pads bite too
-                          # high), 0.009 is the smallest 100/100 value.  Nominal
-                          # fingertip-vs-table clip is 1.5 mm -> real desk needs
-                          # a 2-3 mm mat (HANDOVER calibration item).
+GRASP_DROP = 0.0075       # grasp this far below cube centre.  Under the fixed
+                          # physics (rigid jaw mirror + straight descend) every
+                          # swept drop 0.006-0.012 is 100/100; 0.0075 puts the
+                          # pad dead-centre on the cube with the fingertip
+                          # exactly at the table plane (zero clip -> no mat
+                          # needed on the real desk).  The pre-fix sweep that
+                          # favoured 0.009 was confounded by the descend-shove
+                          # (DECISIONS.md #19).
 
 # Stack-side waypoints.  Carry the held cube high over the base cube, then lower
 # so the held cube's bottom face rests a few mm above the base cube's top.
 STACK_STANDOFF_HEIGHT = 0.085   # cube centre carried this far above base centre
-STACK_RELEASE_GAP = 0.006       # release with cube bottom this far above base top;
-                                # swept {0.006,0.010,0.014,0.020} at drop 0.009:
-                                # all 100/100 -> smallest no-loss gap (fingertip
-                                # still ~4.5 mm clear of the base top at release)
+STACK_RELEASE_GAP = 0.006       # release with cube bottom this far above base
+                                # top; re-swept {0.006,0.010,0.014,0.020} under
+                                # the fixed physics: all 100/100 -> smallest
+                                # no-loss gap
 
 
 class MycobotStackSolver:
@@ -83,23 +86,46 @@ class MycobotStackSolver:
     # ------------------------------------------------------------------ #
     def _move_to_pose(self, target_pos, *,
                       gripper, pin_wrist_roll=None, settle_tol=0.02,
-                      max_steps=1500, viewer=None):
+                      max_steps=1500, viewer=None, straight=False):
+        """LeArm primitive (slew-limited joint tracking of one IK solution),
+        plus a `straight` mode required by the 280's kinematics: joint-space
+        interpolation between the standoff and grasp configs bows the pinch
+        up to 26 mm sideways (measured, DECISIONS.md #19) — more than the
+        8 mm jaw clearance — so vertical strokes near the cubes track a
+        chain of IK via-points every ~12 mm along the straight line instead.
+        Same slew, same settle logic, same grip-then-move discipline."""
         env = self.env
-        q_target = env.solve_ik(target_pos, APPROACH_DOWN,
-                                q_init=env.arm_qpos_now,
-                                pin_wrist_roll=pin_wrist_roll)
+        if straight:
+            start = env.pinch_pos.copy()
+            dist = float(np.linalg.norm(target_pos - start))
+            n_seg = max(1, int(np.ceil(dist / 0.012)))
+            vias = [start + (target_pos - start) * (k / n_seg)
+                    for k in range(1, n_seg + 1)]
+        else:
+            vias = [np.asarray(target_pos, dtype=float)]
         env.set_gripper(gripper)
         slew = 0.005
         q_cmd = env.arm_qpos_now
-        for _ in range(max_steps):
-            step = np.clip(q_target - q_cmd, -slew, slew)
-            q_cmd = q_cmd + step
-            env.set_arm_target(q_cmd)
-            env.step()
-            self._render(viewer)
-            if np.max(np.abs(env.arm_qpos_now - q_target)) < settle_tol:
-                return True
-        return False
+        budget = max_steps
+        for vi, via in enumerate(vias):
+            q_target = env.solve_ik(via, APPROACH_DOWN,
+                                    q_init=q_cmd,
+                                    pin_wrist_roll=pin_wrist_roll)
+            tol = settle_tol if vi == len(vias) - 1 else max(settle_tol, 0.02)
+            reached = False
+            while budget > 0:
+                budget -= 1
+                step = np.clip(q_target - q_cmd, -slew, slew)
+                q_cmd = q_cmd + step
+                env.set_arm_target(q_cmd)
+                env.step()
+                self._render(viewer)
+                if np.max(np.abs(env.arm_qpos_now - q_target)) < tol:
+                    reached = True
+                    break
+            if not reached:
+                return False
+        return True
 
     def _hold(self, steps, *, gripper, viewer=None):
         env = self.env
@@ -156,14 +182,15 @@ class MycobotStackSolver:
         # 2) DESCEND: lower onto the cube.
         log["descend"] = self._move_to_pose(
             grasp_xyz, gripper=GRIPPER_OPEN, pin_wrist_roll=wr,
-            settle_tol=0.01, viewer=viewer)
+            settle_tol=0.01, viewer=viewer, straight=True)
 
         # 3) GRASP: close (separate step from the move).
         self._close_grip(viewer=viewer)
 
         # 4) LIFT: back to standoff, jaws closed.
         log["lift"] = self._move_to_pose(
-            standoff_xyz, gripper=GRIPPER_CLOSE, pin_wrist_roll=wr, viewer=viewer)
+            standoff_xyz, gripper=GRIPPER_CLOSE, pin_wrist_roll=wr,
+            viewer=viewer, straight=True)
 
         # Privileged grasp offset: where the held cube sits relative to the
         # pinch right now.  We use it so the CUBE (not the pinch) lands centred
@@ -190,14 +217,15 @@ class MycobotStackSolver:
         # 6) LOWER: descend so the held cube is just above the base top.
         log["lower"] = self._move_to_pose(
             pinch_place, gripper=GRIPPER_CLOSE, pin_wrist_roll=wr,
-            settle_tol=0.01, viewer=viewer)
+            settle_tol=0.01, viewer=viewer, straight=True)
 
         # 7) RELEASE: open and let the cube settle onto the base.
         self._hold(400, gripper=GRIPPER_OPEN, viewer=viewer)
 
         # 8) RETREAT: rise straight up so the gripper doesn't topple the stack.
         log["retreat"] = self._move_to_pose(
-            pinch_stand, gripper=GRIPPER_OPEN, pin_wrist_roll=wr, viewer=viewer)
+            pinch_stand, gripper=GRIPPER_OPEN, pin_wrist_roll=wr,
+            viewer=viewer, straight=True)
 
         success = env.is_stacked()
         return dict(

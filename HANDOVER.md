@@ -8,9 +8,9 @@ METHOD.md / SESSION_NOTES.
 
 | Gate | Requirement | Result |
 |---|---|---|
-| A (solver) | ≥85% on 100 eps | **PASS — 100/100** |
+| A (solver) | ≥85% on 100 eps | **PASS — 100/100** (re-verified after the DECISIONS #19 physics fixes) |
 | B (pixel floor) | every cube ≥12 px + separable | **PASS — bbox mean 29.3 px, worst-case gap 6 px, 0 sep failures** |
-| C (validation learning signal) | grasp ≥5% or any place/overall | **PASS — grasp 54%, place 24, overall 24/100 (seed 90000)** |
+| C (validation learning signal) | grasp ≥5% or any place/overall | **PASS pre-fix (grasp 54%, overall 24/100); rerun in progress after DECISIONS #19 physics fixes** |
 | D (report-only) | student ≥85% & within 5 pts of solver | TBD |
 
 ## State on disk (`~/mujoco-test/mycobot_stack/`)
@@ -31,8 +31,9 @@ METHOD.md / SESSION_NOTES.
 1. `BASE_HEIGHT_OFFSET` (env constant, default 0.0): measure real base-plate
    height vs table top; the JN housing in the model may differ from your 280
    variant's base.
-2. 2–3 mm compliant mat under the cube zone (GRASP_DROP 0.009 puts the
-   fingertip 1.5 mm below the nominal table plane at the deepest grip).
+2. Work surface: flat and hard; at the deepest grip (GRASP_DROP 0.0075)
+   the fingertip touches the table plane exactly — no mat needed, but avoid
+   raised lips/mats thicker than ~1 mm in the cube zone.
 3. Gripper block: ONLY the palm/finger/pad + `a_grip` + equality section of
    `mycobot_scene_cube_stack.xml` changes if the real gripper differs from
    the modelled 40 mm/19 mm parallel jaws; then re-run

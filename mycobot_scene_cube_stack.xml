@@ -189,7 +189,14 @@
   </worldbody>
 
   <equality>
-    <joint joint1="grip_right" joint2="grip_left" polycoef="0 -1 0 0 0"/>
+    <!-- Rigid jaw mirroring.  With the default (soft) constraint the right
+         jaw drifted ~5 mm open under a ~3 N grip load, the gap exceeded the
+         cube width and the cube slipped to a corner-wedged diagonal dangle
+         (user-spotted in demo_solver_mycobot.mp4; DECISIONS.md #19).  A real
+         parallel gripper is mechanically rack-coupled - near-rigid solref/
+         solimp keeps the jaws symmetric like the hardware. -->
+    <joint joint1="grip_right" joint2="grip_left" polycoef="0 -1 0 0 0"
+           solref="0.002 1" solimp="0.99 0.999 0.001 0.5 2"/>
   </equality>
 
   <actuator>

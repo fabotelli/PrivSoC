@@ -225,7 +225,7 @@ def main():
     ap.add_argument("--episodes", type=int, default=200)
     ap.add_argument("--start-seed", type=int, default=20000)
     ap.add_argument("--workers", type=int, default=8)
-    ap.add_argument("--max-steps", type=int, default=170)
+    ap.add_argument("--max-steps", type=int, default=280)
     ap.add_argument("--rate", type=int, default=50)
     ap.add_argument("--ensemble-decay", type=float, default=0.01)
     ap.add_argument("--save-json", default=None)

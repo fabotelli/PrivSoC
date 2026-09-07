@@ -26,7 +26,7 @@ fi
 
 echo "=== 200-ep diagnostic eval + solver baseline (24 workers) ==="
 python3 eval_bc_mycobot_stack.py --policy "$POLICY" --episodes 200 \
-    --start-seed 20000 --workers 24 --rate 50 --max-steps 170 \
+    --start-seed 20000 --workers 24 --rate 50 --max-steps 280 \
     --ensemble-decay 0.01 --save-json "$EVAL_JSON" 2>&1 \
     | tee mycobot_stack_full_eval.log
 
@@ -34,14 +34,14 @@ echo "=== record success demo (demo_cam + policy_cam) ==="
 python3 record_bc_mycobot_stack.py --policy "$POLICY" \
     --out demo_policy_mycobot.mp4 \
     --policycam-out demo_policy_mycobot_policycam.mp4 \
-    --seed 20000 --max-search 30 --max-steps 170 --rate 50 \
+    --seed 20000 --max-search 30 --max-steps 280 --rate 50 \
     --ensemble-decay 0.01 --vid-res 512 --fps 30 2>&1 \
     | tee demo_record.log
 
 echo "=== record one representative failure (if any) ==="
 python3 record_bc_mycobot_stack.py --policy "$POLICY" --failure \
     --out demo_policy_failure_mycobot.mp4 \
-    --seed 20000 --max-search 100 --max-steps 170 --rate 50 \
+    --seed 20000 --max-search 100 --max-steps 280 --rate 50 \
     --ensemble-decay 0.01 --vid-res 512 --fps 30 2>&1 \
     | tee -a demo_record.log || echo "(no failure found in 100 seeds)"
 

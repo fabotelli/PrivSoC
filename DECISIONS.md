@@ -142,3 +142,39 @@ decision point below was resolved without asking; reasoning logged here.
     18-19% overall) — plausibly the 6-DOF arm's IK redundancy makes joint
     trajectories more multimodal for MSE-BC; the 8000-ep run is where the
     recipe's data-efficiency curve did its work on the LeArm too.
+
+19. **User-flagged grasp defect → two physics fixes, run restarted.** Fabian
+    spotted the held cube looking "deformed" in demo_solver_mycobot.mp4.
+    Diagnosis (measured, not guessed): (a) the jaw equality coupling at
+    MuJoCo default softness let the right jaw drift 4.7 mm open under a ~3 N
+    grip load → the 21 mm gap exceeded the 19 mm cube → corner-wedged
+    diagonal dangle (rigid cube, 0.1-0.2 mm pad penetration — no actual
+    deformation); (b) the joint-space slewed DESCEND bowed the pinch up to
+    26 mm laterally (vs 8 mm jaw clearance) — an open pad plowed the cube
+    8 mm into the table and tilted it 17° before the jaws even closed (the
+    5-DOF LeArm's arcs were small; the 280's kinematics make them huge).
+    Fixes: equality solref="0.002 1" solimp="0.99 0.999 0.001" (rigid
+    rack-coupled mirror like real hardware; violation now 0.04 mm), and a
+    `straight=True` mode in _move_to_pose used by descend/lift/lower/retreat
+    (IK via-points every 12 mm along the straight line; same slew/settle/
+    grip-then-move discipline; lateral moves at altitude unchanged, they
+    clear the cubes by ~37 mm). Carry is now square and upright (up=1.0000).
+    The in-flight 8000-ep collection (~7300 done) used the old physics →
+    killed and purged along with all validation artifacts; full rerun from
+    Stage A.
+
+20. **Sweeps redone under fixed physics; GRASP_DROP = 0.0075.** All drops
+    {0.006, 0.0075, 0.009, 0.012} now 100/100 — the pre-fix sweep that
+    "needed" 0.009 was confounded by the descend-shove. 0.0075 puts the pad
+    dead-centre on the cube with the fingertip exactly at the table plane:
+    zero clip, the 2-3 mm mat calibration item is GONE. Release-gap re-sweep
+    {0.006,0.010,0.014,0.020} all 100/100 → 0.006 stands. GATE A re-run:
+    **100/100**. Solver demo re-recorded.
+
+21. **Episode length 53 → 84 frames (max 89) from via-point settling;
+    budgets rescaled.** --max-frames-per-episode 160 kept (covers 89 with
+    1.8x margin). Eval/record --max-steps 170 → **280**, preserving
+    cube_stack's ~3.3x margin over the teacher's mean episode length
+    (170/51 ≈ 280/84). Dataset will be ~2.2x the LeArm's frames (~672k,
+    ~132 GB): fits RAM (210 GB avail) and disk (385 GB free vs ~264 GB
+    merge peak). Collection ~2.4 h, train ~75 min expected.

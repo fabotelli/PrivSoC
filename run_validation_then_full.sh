@@ -44,7 +44,7 @@ echo "val train rc=$? $(date -u +%FT%TZ)"; tail -20 train_val.log
 # --- A3: eval 100 eps ---
 python3 eval_bc_mycobot_stack.py \
     --policy bc_mycobot_val.pt --episodes "$VAL_EVAL_EPS" \
-    --start-seed 90000 --workers 24 --rate 50 --max-steps 170 \
+    --start-seed 90000 --workers 24 --rate 50 --max-steps 280 \
     --ensemble-decay 0.01 --save-json eval_val.json > eval_val.log 2>&1
 echo "val eval rc=$? $(date -u +%FT%TZ)"; cat eval_val.log
 

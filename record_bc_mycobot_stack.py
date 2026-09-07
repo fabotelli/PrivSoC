@@ -107,7 +107,7 @@ def main():
     ap.add_argument("--max-search", type=int, default=30,
                     help="how many sequential seeds to try")
     ap.add_argument("--rate", type=int, default=50)
-    ap.add_argument("--max-steps", type=int, default=170)
+    ap.add_argument("--max-steps", type=int, default=280)
     ap.add_argument("--ensemble-decay", type=float, default=0.01)
     ap.add_argument("--vid-res", type=int, default=512)
     ap.add_argument("--fps", type=int, default=30)
