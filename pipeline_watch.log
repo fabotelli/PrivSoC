@@ -1,2 +1,17 @@
 === watch start 2026-09-07T02:56:49Z pid=1436831 ===
 2026-09-07T02:56:49Z  [COLLECT] gpu=0 %, 21985 MiB  |   [     0/800] workers=[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] 0.00 ep/s  elapsed 0:00:00  ETA 0:00:00
+2026-09-07T02:58:49Z  [COLLECT] gpu=0 %, 21985 MiB  |   [   102/800] workers=[5, 4, 5, 4, 4, 4, 5, 4, 5, 4, 4, 5, 4, 4, 4, 4, 4, 4, 4, 4, 5, 4, 4, 4] 1.27 ep/s  elapsed 0:01:20  ETA 0:09:09
+2026-09-07T03:00:49Z  [COLLECT] gpu=100 %, 21985 MiB  |   [   300/800] workers=[13, 13, 13, 13, 12, 13, 13, 13, 13, 13, 12, 13, 12, 12, 13, 13, 12, 12, 12, 12, 12, 12, 12, 12] 1.43 ep/s  elapsed 0:03:30  ETA 0:05:50
+2026-09-07T03:02:49Z  [COLLECT] gpu=0 %, 21985 MiB  |   [   504/800] workers=[21, 21, 21, 21, 21, 21, 22, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 20] 1.46 ep/s  elapsed 0:05:45  ETA 0:03:23
+2026-09-07T03:04:49Z  [COLLECT] gpu=0 %, 21985 MiB  |   [   702/800] workers=[30, 29, 30, 29, 29, 29, 30, 29, 30, 29, 29, 29, 29, 30, 30, 29, 29, 29, 29, 29, 29, 29, 29, 29] 1.46 ep/s  elapsed 0:08:00  ETA 0:01:07
+2026-09-07T03:06:49Z  *** TRAIN STARTED — GPU now: 48 %, 1971 MiB  ***
+2026-09-07T03:06:49Z  [TRAIN] gpu=48 %, 1971 MiB  | epoch   2/12  train 0.19360  val 0.14397  lr 2.95e-04   10.0s  <- best, saved
+2026-09-07T03:08:49Z  [TRAIN] gpu=0 %, 1971 MiB  |   [eval epoch 12] launched bg subprocess pid=1441900
+2026-09-07T03:10:49Z  [TRAIN] gpu=0 %, 1971 MiB  |   [eval epoch 12] launched bg subprocess pid=1441900
+2026-09-07T03:12:49Z  [TRAIN] gpu=0 %, 1971 MiB  |   [eval epoch 12] launched bg subprocess pid=1441900
+2026-09-07T03:14:50Z  [TRAIN] gpu=0 %, 1971 MiB  |   [eval epoch 12] launched bg subprocess pid=1441900
+2026-09-07T03:16:50Z  [TRAIN] gpu=0 %, 1971 MiB  |   [eval epoch 12] launched bg subprocess pid=1441900
+2026-09-07T03:18:50Z  [TRAIN] gpu=0 %, 1971 MiB  |   [eval epoch 5] 23/100 = 23.0%
+2026-09-07T03:20:50Z  [COLLECT] gpu=0 %, 21985 MiB  | Saved dataset_val.npz (8.23 GB) in 0:09:24: 41842 frames from 783 episodes (97.9% solve rate).
+2026-09-07T03:22:50Z  [COLLECT] gpu=0 %, 21985 MiB  | Saved dataset_val.npz (8.23 GB) in 0:09:24: 41842 frames from 783 episodes (97.9% solve rate).
+2026-09-07T03:24:50Z  [COLLECT] gpu=0 %, 21985 MiB  |   [   104/8000] workers=[5, 4, 5, 4, 5, 5, 5, 4, 4, 4, 4, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4] 1.30 ep/s  elapsed 0:01:20  ETA 1:41:36

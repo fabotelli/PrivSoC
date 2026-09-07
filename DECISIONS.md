@@ -133,3 +133,12 @@ decision point below was resolved without asking; reasoning logged here.
     95.8% solve rate under DR at min-sep 0.065. Launched
     run_validation_then_full.sh detached (renice -10 per standing rule) with
     pipeline_watch.sh attached.
+
+18. **GATE C PASS: validation (783 kept eps, 97.9% teacher solve rate under
+    DR, 8.23 GB, 9m24s collect; 12-epoch train, val 0.0607) → held-out eval
+    seed 90000: grasp 54%, place_on_top 24, overall 24/100 — far above the
+    ≥5%-grasp bar. Auto-continuing to the full 8000-ep run. Note: weaker
+    than cube_stack's 71% at the same stage (in-flight seed-20000 evals:
+    18-19% overall) — plausibly the 6-DOF arm's IK redundancy makes joint
+    trajectories more multimodal for MSE-BC; the 8000-ep run is where the
+    recipe's data-efficiency curve did its work on the LeArm too.

@@ -1,0 +1,30 @@
+gpu_claim: killing xbdream vLLM (1436003 1436112 ) for pipeline training
+gpu_claim: GPU mem used=0MiB -> running: python3 train_bc_mycobot_stack.py --data dataset_val.npz --out bc_mycobot_val.pt --epochs 12 --lr 3e-4 --batch 256 --num-workers 8 --chunk 8 --augment --ensemble-decay 0.01
+device: cuda | chunk=8
+side images: (41842, 256, 256, 3) uint8 (8.2 GB)
+RAM plan: full dataset fits in RAM
+loaded side (41842, 256, 256, 3) in 4.6s
+episodes loaded: 783  frames loaded: 41842
+samples: train=33826  val=1752  chunk=8
+model: 13.20M params, bottleneck=256, chunk=8, img_hw=(256, 256)
+epoch   1/12  train 0.49818  val 0.24546  lr 3.00e-04   11.2s  <- best, saved
+epoch   2/12  train 0.19360  val 0.14397  lr 2.95e-04   10.0s  <- best, saved
+epoch   3/12  train 0.12439  val 0.10851  lr 2.80e-04   10.0s  <- best, saved
+epoch   4/12  train 0.09674  val 0.08912  lr 2.56e-04   10.2s  <- best, saved
+epoch   5/12  train 0.08349  val 0.08006  lr 2.25e-04   10.1s  <- best, saved
+  [eval epoch 5] launched bg subprocess pid=1440144
+epoch   6/12  train 0.07483  val 0.07575  lr 1.89e-04   10.9s  <- best, saved
+epoch   7/12  train 0.06915  val 0.06938  lr 1.50e-04   11.3s  <- best, saved
+epoch   8/12  train 0.06395  val 0.06758  lr 1.11e-04   11.3s  <- best, saved
+epoch   9/12  train 0.06073  val 0.06528  lr 7.51e-05   11.2s  <- best, saved
+epoch  10/12  train 0.05786  val 0.06213  lr 4.40e-05   11.4s  <- best, saved
+  [eval epoch 10] launched bg subprocess pid=1441093
+epoch  11/12  train 0.05584  val 0.06126  lr 2.02e-05   13.4s  <- best, saved
+epoch  12/12  train 0.05469  val 0.06070  lr 5.21e-06   14.0s  <- best, saved
+  [eval epoch 12] launched bg subprocess pid=1441900
+  [eval epoch 5] 23/100 = 23.0%
+  [eval epoch 10] 19/100 = 19.0%
+  [eval epoch 12] 18/100 = 18.0%
+
+Done. Best val 0.06070 -> bc_mycobot_val.pt
+gpu_claim: command rc=0; releasing watchdog lock

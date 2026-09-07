@@ -1,1 +1,56 @@
 === STAGE A: VALIDATION START 2026-09-07T02:56:46Z eps=800 epochs=12 ===
+val collect rc=0 2026-09-07T03:06:11Z
+  [   406/800] workers=[17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 16, 17, 17, 17, 17, 17, 17, 16] 1.45 ep/s  elapsed 0:04:40  ETA 0:04:32
+  [   504/800] workers=[21, 21, 21, 21, 21, 21, 22, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 20] 1.46 ep/s  elapsed 0:05:45  ETA 0:03:23
+  [   600/800] workers=[25, 25, 25, 25, 25, 25, 26, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 24] 1.46 ep/s  elapsed 0:06:50  ETA 0:02:16
+  [   702/800] workers=[30, 29, 30, 29, 29, 29, 30, 29, 30, 29, 29, 29, 29, 30, 30, 29, 29, 29, 29, 29, 29, 29, 29, 29] 1.46 ep/s  elapsed 0:08:00  ETA 0:01:07
+  [   800/800] workers=[34, 34, 34, 34, 34, 34, 34, 34, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33] 1.48 ep/s  elapsed 0:09:01  ETA 0:00:00
+
+All workers done in 0:09:01. Kept 783 episodes. Merging into dataset_val.npz ...
+Saved dataset_val.npz (8.23 GB) in 0:09:24: 41842 frames from 783 episodes (97.9% solve rate).
+val train rc=0 2026-09-07T03:19:11Z
+epoch   2/12  train 0.19360  val 0.14397  lr 2.95e-04   10.0s  <- best, saved
+epoch   3/12  train 0.12439  val 0.10851  lr 2.80e-04   10.0s  <- best, saved
+epoch   4/12  train 0.09674  val 0.08912  lr 2.56e-04   10.2s  <- best, saved
+epoch   5/12  train 0.08349  val 0.08006  lr 2.25e-04   10.1s  <- best, saved
+  [eval epoch 5] launched bg subprocess pid=1440144
+epoch   6/12  train 0.07483  val 0.07575  lr 1.89e-04   10.9s  <- best, saved
+epoch   7/12  train 0.06915  val 0.06938  lr 1.50e-04   11.3s  <- best, saved
+epoch   8/12  train 0.06395  val 0.06758  lr 1.11e-04   11.3s  <- best, saved
+epoch   9/12  train 0.06073  val 0.06528  lr 7.51e-05   11.2s  <- best, saved
+epoch  10/12  train 0.05786  val 0.06213  lr 4.40e-05   11.4s  <- best, saved
+  [eval epoch 10] launched bg subprocess pid=1441093
+epoch  11/12  train 0.05584  val 0.06126  lr 2.02e-05   13.4s  <- best, saved
+epoch  12/12  train 0.05469  val 0.06070  lr 5.21e-06   14.0s  <- best, saved
+  [eval epoch 12] launched bg subprocess pid=1441900
+  [eval epoch 5] 23/100 = 23.0%
+  [eval epoch 10] 19/100 = 19.0%
+  [eval epoch 12] 18/100 = 18.0%
+
+Done. Best val 0.06070 -> bc_mycobot_val.pt
+gpu_claim: command rc=0; releasing watchdog lock
+val eval rc=0 2026-09-07T03:23:11Z
+running 100 eval episodes on 24 workers (decay=0.01, max_steps=170)...
+  policy eval done in 238.1s
+
+======================================================================
+  bc_mycobot_val.pt                    (100 eps, decay 0.01)
+  overall success (farther stacked on nearer) : 24/100 = 24.0%
+  correct-selection (picked FARTHER cube)      : 54/100 = 54.0%
+  grasp success (farther cube lifted/moved)    : 54/100 = 54.0%
+  place-on-top (landed on the nearer cube)     : 24/100 = 24.0%
+  -- failure modes --
+  wrong_cube_picked     : 1/100 = 1.0%
+  missed_grasp          : 43/100 = 43.0%
+  placement_miss        : 30/100 = 30.0%
+  knocked_over_unstable : 2/100 = 2.0%
+  -- solver baseline overall : 97/100 = 97.0%
+  elapsed 239.3s
+======================================================================
+wrote eval_val.json
+=== GATE 2026-09-07T03:23:11Z ===
+gate: n=100 grasp=54 place_on_top=24 overall=24 grasp_rate=54.00%
+GATE RESULT: PASS
+=== GATE PASSED -> STAGE B: FULL PIPELINE 2026-09-07T03:23:11Z ===
+=== PIPELINE START 2026-09-07T03:23:11Z  nproc=1 collect_workers=24 episodes=8000 ===
+=== COLLECT (8000 eps, 24 workers, 256px, successes-only) ===
