@@ -116,3 +116,20 @@ decision point below was resolved without asking; reasoning logged here.
     6 px — identical to the LeArm scene's verified floor, confirming the
     translate-don't-redesign camera decision (#7/#14). CUBE_MIN_SEP stays
     0.065.
+
+16. **GPU claim protocol for training.** The box runs an idle-GPU harvester
+    (xbdream vLLM via ~/xbrain/gpu_yield_watchdog.sh, cron */5) that held
+    21.9 GiB of the A10 and OOM'd the smoke train instantly (the watchdog
+    kills vLLM on foreign demand, but only within its 5-min cycle — too slow
+    for a fresh CUDA init). Added gpu_claim.sh: hold the watchdog's own
+    flock, kill vLLM, wait for <1 GiB used, run the wrapped training, release
+    on exit; logged to xbrain daemon_notices (capacity-declines must not be
+    silent). Both drivers wrap their train step with it. Collection stays
+    CPU/osmesa (pipeline unchanged), so vLLM may reclaim the GPU between
+    training phases — by design.
+
+17. **Smoke test before the validation stage** (24-ep collect → 2-epoch train
+    → in-flight eval → failure-mode record): all ports work; 13.20M params;
+    95.8% solve rate under DR at min-sep 0.065. Launched
+    run_validation_then_full.sh detached (renice -10 per standing rule) with
+    pipeline_watch.sh attached.
