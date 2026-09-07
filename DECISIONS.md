@@ -109,3 +109,10 @@ decision point below was resolved without asking; reasoning logged here.
     0.353), demo_cam (0.373, -0.550, 0.600), orientations verbatim from the
     LeArm scene, aimed at the final zone centre (0.1725, 0, 0.16). Framing
     verified by renders; pixel floor verified in Gate B.
+
+15. **GATE B PASS (pixel floor, 256x256):** bbox max side 21..41 px (mean
+    29.3) vs 12 px floor; saturation 0.83; 0/14 separation failures; forced
+    min-sep pairs at the new zone centre (0.1725,-0.005) worst-case bg gap
+    6 px — identical to the LeArm scene's verified floor, confirming the
+    translate-don't-redesign camera decision (#7/#14). CUBE_MIN_SEP stays
+    0.065.
