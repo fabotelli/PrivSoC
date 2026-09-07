@@ -1,0 +1,4 @@
+ep  98 farther=b nearer=a success=True  0.2s phases={'approach': True, 'descend': True, 'lift': True, 'over_base': True, 'lower': True, 'retreat': True}
+ep  99 farther=b nearer=a success=True  0.2s phases={'approach': True, 'descend': True, 'lift': True, 'over_base': True, 'lower': True, 'retreat': True}
+
+100/100 stacked = 100.0%

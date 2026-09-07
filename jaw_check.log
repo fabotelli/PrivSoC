@@ -1,0 +1,12 @@
+seed 100: farther=b cube_yaw=  120.4 jaw= -149.6 misalign= -0.01 deg
+seed 101: farther=b cube_yaw=  -48.9 jaw= -138.9 misalign= -0.01 deg
+seed 102: farther=b cube_yaw=  -55.6 jaw= -145.5 misalign=  0.10 deg
+seed 103: farther=b cube_yaw= -142.7 jaw= -142.7 misalign=  0.00 deg
+seed 104: farther=b cube_yaw=   13.8 jaw= -166.2 misalign= -0.02 deg
+seed 105: farther=a cube_yaw= -145.2 jaw= -145.1 misalign=  0.03 deg
+seed 106: farther=a cube_yaw= -135.8 jaw= -135.8 misalign=  0.03 deg
+seed 107: farther=b cube_yaw=  -23.7 jaw= -113.7 misalign=  0.04 deg
+seed 108: farther=b cube_yaw=   36.2 jaw= -143.8 misalign= -0.02 deg
+seed 109: farther=b cube_yaw=    1.4 jaw= -178.6 misalign=  0.04 deg
+
+worst misalignment: 0.10 deg (PASS)

@@ -1,0 +1,12 @@
+=== GRASP_DROP sweep (gap=0.010, 100 eps, seeds 0-99) ===
+  drop=0.004: 75/100 stacked  frames mean=52.9 max=58.3  ik_fails={}
+  drop=0.008: 92/100 stacked  frames mean=52.8 max=57.4  ik_fails={}
+  drop=0.012: 100/100 stacked  frames mean=53.1 max=57.7  ik_fails={}
+best GRASP_DROP = 0.012
+
+=== STACK_RELEASE_GAP sweep (drop=0.012, 100 eps) ===
+  gap=0.006: 100/100 stacked  frames mean=53.4 max=58.1  ik_fails={}
+  gap=0.010: 100/100 stacked  frames mean=53.1 max=57.7  ik_fails={}
+  gap=0.014: 100/100 stacked  frames mean=52.7 max=57.3  ik_fails={}
+  gap=0.020: 100/100 stacked  frames mean=52.1 max=56.7  ik_fails={}
+best (smallest no-loss) STACK_RELEASE_GAP = 0.006 (100/100)

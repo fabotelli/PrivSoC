@@ -77,3 +77,35 @@ decision point below was resolved without asking; reasoning logged here.
    solution directly above (and passes everywhere, <=0.75 mm). The check
    seeds grasp targets from the standoff solution accordingly; standoff and
    stack-standoff still verify from the home seed.
+
+10. **GRASP_DROP = 0.009 (swept 0.004-0.012, failure-mode diagnosed).**
+    Coarse sweep at gap 0.010: 0.004→75%, 0.008→92%, 0.012→100%. Fine sweep:
+    0.006→53%, 0.0075→79% (all failures = missed_grasp: the 19 mm pads bite
+    too high and the cube slips), 0.009→100%. 0.009 is the smallest 100/100
+    value. Physical-realism check: the fingertip extends 2 mm past the pinch
+    site, so drop 0.009 nominally clips the table plane by 1.5 mm (0.012
+    would clip 4.5 mm — rejected). On the real desk this is absorbed by a
+    2-3 mm mat under the workspace (HANDOVER calibration item).
+
+11. **STACK_RELEASE_GAP = 0.006 (swept {0.006,0.010,0.014,0.020} x 100 eps
+    at drop 0.009): all four 100/100 → per the ticket rule, smallest no-loss
+    gap.** Unlike the LeArm (where 0.006 lost 15 pts to finger-shove), the
+    280's shallower jaws keep the fingertip ~4.5 mm above the base-cube top
+    at release, so the smallest gap is safe.
+
+12. **Wrist-roll formula carried over unchanged.** Both arms roll the jaws
+    about a downward approach axis with jaws closing along the pinch y-axis,
+    so jaw_at_wr0 - wr algebra is identical; re-derived jaw_at_wr0 from the
+    280's pinch frame and verified on 10 rendered seeds: worst jaw/cube
+    misalignment 0.10 deg (jaw_check/).
+
+13. **GATE A PASS: 100/100 stacked** (`mycobot_stack_solver.py --episodes 100
+    --seed 0`), vs the 85% bar and the LeArm teacher's 87%. Episode length
+    52-58 policy frames at rate 50 (LeArm ~51) → --max-frames-per-episode 160
+    kept; eval --max-steps stays 170 (58 max frames + ~3x margin, matching
+    cube_stack's 170-for-51 ratio).
+
+14. **Cameras (final, supersedes #7 numbers):** policy_cam (0.357, -0.242,
+    0.353), demo_cam (0.373, -0.550, 0.600), orientations verbatim from the
+    LeArm scene, aimed at the final zone centre (0.1725, 0, 0.16). Framing
+    verified by renders; pixel floor verified in Gate B.

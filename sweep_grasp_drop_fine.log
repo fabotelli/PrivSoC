@@ -1,0 +1,6 @@
+drop=0.0060 gap=0.010: 53/100  modes={'missed_grasp': 47, 'success': 53}
+drop=0.0075 gap=0.006: 79/100  modes={'missed_grasp': 21, 'success': 79}
+drop=0.0075 gap=0.010: 79/100  modes={'missed_grasp': 21, 'success': 79}
+drop=0.0075 gap=0.014: 79/100  modes={'missed_grasp': 21, 'success': 79}
+drop=0.0075 gap=0.020: 79/100  modes={'missed_grasp': 21, 'success': 79}
+drop=0.0090 gap=0.010: 100/100  modes={'success': 100}
