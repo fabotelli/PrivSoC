@@ -1,0 +1,181 @@
+# TICKET: mycobot_stack — full pipeline, end to end (no stops)
+
+Run under the same **no-input rules** as the cube_stack run: resolve every
+decision point yourself, log each one in `DECISIONS.md` with the reasoning,
+and never wait for input. Gates below are **auto-continue on PASS**; only a
+FAIL stops the run, and then you write the failure to `HANDOVER.md` and exit.
+Follow the evidence on disk over any briefing. Launch long stages under
+`nohup`/`setsid` so they survive SSH drops; write a `pipeline_watch.log`
+exactly like cube_stack's watcher. Do not touch `~/mujoco-test/cube_stack/`.
+
+## Context
+
+`~/mujoco-test/cube_stack/` is a working single-cam chunked-BC pipeline for
+two-cube stacking on a 5-DOF LeArm (91.5% final). Read its
+`SESSION_NOTES_2026-06-10_cube_stack.md` and `DECISIONS.md` first. We are
+porting the **whole pipeline unchanged** to a **myCobot 280** (6 revolute
+joints + parallel gripper) for a real sim-to-real transfer. The privileged
+teacher generates the data; the student is trained by supervised behaviour
+cloning (action-chunked, single side camera, temporal ensemble at inference).
+Nothing in the recipe changes; only the arm, gripper, and geometry constants.
+
+## Final deliverables (all in `~/mujoco-test/mycobot_stack/`, committed to git,
+and copied to `~/Downloads/mycobot_stack_<date>/`)
+
+```
+bc_mycobot_stack.pt                    # final policy (best-val epoch)
+bc_mycobot_stack_epoch{5,10,15,20,25}.pt
+demo_solver_mycobot.mp4                # teacher rollout, demo_cam
+demo_policy_mycobot.mp4                # student success rollout, demo_cam
+demo_policy_mycobot_policycam.mp4      # same rollout from policy_cam (what the net sees)
+demo_policy_failure_mycobot.mp4        # one representative failure, if any
+eval_mycobot_stack_final.json          # 200-ep diagnostic eval
+METHOD.md                              # full method write-up (spec below)
+DECISIONS.md                           # every autonomous decision, numbered
+SESSION_NOTES_<date>_mycobot_stack.md  # rendered by render_notes.py
+HANDOVER.md                            # state, what passed, calibration items, next steps
+```
+
+---
+
+## STEP 1 — Arm model
+
+Source: `https://github.com/elephantrobotics/mycobot_mujoco` (official).
+Clone it; use `xml/mycobot_280jn_mujoco.xml` + `meshes_mujoco/*.stl`. It
+loads in MuJoCo 3 as-is: 6 hinge joints with limits, inertials, collision
+meshes; **no actuators, gripper, lights, or cameras**. Keep Elephant's joint
+names (`joint2_to_joint1` … `joint7_to_joint6`; J1 is `joint2_to_joint1`) so
+they map 1:1 to `pymycobot` joint indices.
+
+It is the Jetson-Nano variant; arm kinematics are identical across 280
+variants, only the base housing differs. Expose `BASE_HEIGHT_OFFSET = 0.0`
+in the env and list it as a calibration item in HANDOVER.
+
+## STEP 2 — Scene: `mycobot_scene_cube_stack.xml`
+
+2.1 **Actuators.** `<position>` on all six joints, `kp=20 kv=2`, forcerange
+±20 (same pattern as `learm_scene_cube_stack.xml`). Names `a_j1..a_j6`, plus
+`a_grip`. Do not tune for speed; the 280's servos are slow and weak.
+
+2.2 **Gripper.** Assume Elephant's parallel gripper (~40 mm max opening,
+~20 mm jaw depth). Two box fingers on `joint6_flange`, one actuated slide
+joint `grip_left`, right jaw coupled via `<equality><joint polycoef="0 -1 0 0 0">`
+exactly as the LeArm scene. `pinch` site at the fingertip midpoint, z-axis
+along the approach direction. `GRIPPER_OPEN`/`GRIPPER_CLOSE` as constants.
+Flag in HANDOVER that only this block changes if the real gripper differs.
+
+2.3 **Copy from `learm_scene_cube_stack.xml`:** table, pedestal, lights,
+`cube_a`/`cube_b` (identical red, 1.9 cm, free joints, `cube_red` material,
+geom name `cube_a_geom` kept), `policy_cam`, `demo_cam`, a `wrist_cam` on the
+flange (recorded? no — single-cam recipe; keep it in the XML for the next
+phase only), collision filtering, `<option timestep>`. Re-centre the cube zone
+and cameras for the 280's reach (~280 mm; shoulder z≈0.158 m). Choose the
+table height so the cube zone is at a non-singular pose; log it. Keep
+**256×256 policy_cam**.
+
+2.4 **Reach check.** Port `solve_ik` (generic DLS; only the `pin_wrist_roll`
+index changes 4→5). Verify convergence (`pos_tol 8e-4`) at the four corners
+and centre of the cube zone at grasp, standoff, and stack-standoff heights.
+Shrink/shift the zone until all pass; log the final bounds.
+
+## STEP 3 — Env + solver port
+
+`mycobot_stack_env.py` = `cube_stack_env.py` with only: `ARM_JOINTS` (six
+Elephant names), `ARM_ACTS` (`a_j1..a_j6`), roll index 4→5, `home_seed`,
+`home_xy`, `table_top_z`, cube zone bounds. `CUBE_MIN_SEP` stays 0.065 until
+Step 4 says otherwise.
+
+`mycobot_stack_solver.py` = `cube_stack_solver.py`, FSM and motion primitives
+verbatim (`slew=0.005`, grip-then-move, privileged grasp offset). Re-sweep
+only geometry:
+- `GRASP_DROP` — for the new jaw depth
+- `STACK_RELEASE_GAP` — sweep {0.006, 0.010, 0.014, 0.020} × 100 eps; pick
+  the smallest gap with no loss vs best; log the table (cf. cube_stack
+  DECISIONS #4)
+- `STANDOFF_HEIGHT`, `STACK_STANDOFF_HEIGHT` — keep unless the gripper is
+  taller than the LeArm's
+- `_wrist_roll_for_cube` — re-derive `jaw_at_wr0` for the new pinch frame;
+  verify jaw/cube alignment on 10 rendered seeds
+
+Record `demo_solver_mycobot.mp4` (demo_cam, 512 px, 30 fps).
+
+**GATE A:** `python3 mycobot_stack_solver.py --episodes 100 --seed 0` ≥ 85%
+stacked. PASS → continue. FAIL → log phase-flag breakdown, stop.
+
+## STEP 4 — Pixel-floor preflight
+
+Copy `check_pixel_floor.py`; run at 256×256 with 8 random seeds + 6 forced
+worst-case pairs at `CUBE_MIN_SEP`. Required: every cube ≥ 12 px bbox side,
+two blobs separable (background gap ≥ ~6 px worst case). If it fails, move
+`policy_cam` closer / raise `CUBE_MIN_SEP` (sweep 0.055–0.085) — **never**
+lower resolution (128 failed in prior sessions). Log the table.
+
+**GATE B:** floor PASS and separable PASS. FAIL → stop.
+
+## STEP 5 — Collect
+
+Copy `collect_dataset_cube_stack.py` → `collect_dataset_mycobot_stack.py`,
+changing only imports, `JOINT_NAMES = ARM_JOINTS + ["grip_left"]` (now 7),
+and the metadata names. Same DR (lighting + table only; cubes stay identical
+red). Same atomic checkpoint/merge. BLAS threads = 1 inside the module.
+
+**Validation run first** (copy `run_validation_then_full.sh` verbatim, paths
+renamed): 800 eps → train 12 epochs → eval 100 (seed 90000).
+
+**GATE C:** any real learning signal (grasp ≥ 5% or any place_on_top or any
+overall). PASS → auto-continue to full run. FAIL → stop.
+
+**Full run:** `--episodes 8000 --workers 24 --resolution 256 --rate 50
+--max-frames-per-episode 160 --successes-only --out dataset_mycobot_stack.npz`.
+If episodes are longer than the LeArm's (~51 frames), raise
+`--max-frames-per-episode` from the validation-run max and log it.
+
+## STEP 6 — Train
+
+Copy `train_bc_cube_stack.py` → `train_bc_mycobot_stack.py` (only the
+in-flight eval target changes). **Recipe verbatim, do not change:**
+`--epochs 25 --lr 3e-4 --batch 256 --num-workers 8 --chunk 8 --augment
+--ensemble-decay 0.01`. `n_joints` is read from the dataset (7). Per-epoch
+100-ep evals at 5/10/15/20/25 as before. Verify GPU is engaged at train
+start (watcher log).
+
+## STEP 7 — Eval + record
+
+Copy `eval_bc_cube_stack.py` → `eval_bc_mycobot_stack.py` (imports + gripper
+joint name only). Set `--max-steps` from the solver's measured episode
+length + margin (cube_stack used 170 for ~51-frame episodes) and log it.
+
+Final: 200 eps, seed 20000, decay 0.01, 24 workers, with solver baseline on
+the same seeds. Record `demo_policy_mycobot.mp4`,
+`demo_policy_mycobot_policycam.mp4`, and one failure mp4 if any failures
+exist. Run `render_notes.py` → SESSION_NOTES.
+
+**GATE D (report only, never stops):** student ≥ 85% and within 5 pts of
+solver = "demo-ready"; otherwise "needs iteration". Either way, finish
+deliverables.
+
+## STEP 8 — METHOD.md
+
+Write for an engineer who has not seen cube_stack. Sections:
+1. Task definition (identical cubes, farther/nearer rule, success tolerance)
+2. Simulator: arm source, actuators, gripper model, scene, cameras, DR
+3. Privileged teacher: FSM, IK, placement-offset trick, constants + sweep tables
+4. Data: collection command, kept/total episodes, frames, GB, wall time
+5. Student: architecture (`BCPolicySideChunk`), inputs/outputs, normalisation,
+   optimiser/schedule/augment, chunking + temporal ensemble at inference
+6. Results: per-epoch table, final 200-ep diagnostic breakdown, solver baseline
+7. Sim-to-real checklist: base-height offset, gripper geometry, camera pose
+   (intrinsics/extrinsics to match `policy_cam`), joint-limit and speed
+   calibration, `pymycobot` joint-index mapping, command-rate vs `--rate`
+8. Known gaps and what to try next
+
+Also write `HANDOVER.md` (state on disk, gate results, calibration items) and
+copy all deliverables to `~/Downloads/mycobot_stack_<date>/`. `git commit`.
+
+## Do not
+- Do not change resolution, chunk size, rate, augmentation, optimiser, or any
+  other recipe hyperparameter.
+- Do not tune actuator gains for speed.
+- Do not "fix" the recipe if a gate fails — write the failure and stop.
+- Do not delete or modify anything under `~/mujoco-test/cube_stack/`.
+- Do not wait for input at any point.

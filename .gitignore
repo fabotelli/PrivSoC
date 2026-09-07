@@ -1,0 +1,19 @@
+# Large regenerable artifacts (kept in scp backup, not in git)
+*.npz
+*.pt
+*.w*.npy
+*.merge.*.npy
+*.ckpt.npz
+*.run.json
+__pycache__/
+.claude/
+*.pid
+pipeline_run.done
+
+# track the final policy
+!bc_mycobot_stack.pt
+
+# vendored upstream clone (provenance in METHOD.md)
+mycobot_mujoco/
+# rclone disk-freeing log
+rclone_data_hr.log
