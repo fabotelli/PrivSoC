@@ -1,0 +1,17 @@
+running 200 eval episodes on 24 workers (decay=0.01, max_steps=280)...
+  policy eval done in 763.5s
+
+======================================================================
+  bc_mycobot_stack_epoch10.pt          (200 eps, decay 0.01)
+  overall success (farther stacked on nearer) : 97/200 = 48.5%
+  correct-selection (picked FARTHER cube)      : 130/200 = 65.0%
+  grasp success (farther cube lifted/moved)    : 130/200 = 65.0%
+  place-on-top (landed on the nearer cube)     : 97/200 = 48.5%
+  -- failure modes --
+  wrong_cube_picked     : 0/200 = 0.0%
+  missed_grasp          : 69/200 = 34.5%
+  placement_miss        : 33/200 = 16.5%
+  knocked_over_unstable : 1/200 = 0.5%
+  elapsed 763.6s
+======================================================================
+wrote eval200_epoch10.json
